@@ -76,13 +76,15 @@ export default function Dashboard({ onNavigateTab }) {
   const displayedLeads = productLeads.filter((lead) => {
     const matchesDiv =
       filterDivision === "all" ||
-      (lead.category && lead.category.toLowerCase() === filterDivision.toLowerCase());
+      (lead.category &&
+        lead.category.toLowerCase() === filterDivision.toLowerCase());
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       q === "" ||
       (lead.name && lead.name.toLowerCase().includes(q)) ||
       (lead.company && lead.company.toLowerCase().includes(q)) ||
-      (lead.productInquired && lead.productInquired.toLowerCase().includes(q)) ||
+      (lead.productInquired &&
+        lead.productInquired.toLowerCase().includes(q)) ||
       (lead.id && lead.id.toLowerCase().includes(q));
     return matchesDiv && matchesSearch;
   });
@@ -294,7 +296,9 @@ export default function Dashboard({ onNavigateTab }) {
               <div className="w-9 h-9 rounded-lg bg-[#105784]/10 text-[#105784] flex items-center justify-center mb-2.5 group-hover:scale-105 transition">
                 <Mail className="w-4 h-4" />
               </div>
-              <div className="text-xs font-bold text-[#1c232f]">Contact Leads</div>
+              <div className="text-xs font-bold text-[#1c232f]">
+                Contact Leads
+              </div>
               <div className="text-[11px] text-gray-400 mt-0.5">
                 All public inquiries & RFQs ({leads.length})
               </div>
@@ -307,7 +311,9 @@ export default function Dashboard({ onNavigateTab }) {
               <div className="w-9 h-9 rounded-lg bg-[#105784]/10 text-[#105784] flex items-center justify-center mb-2.5 group-hover:scale-105 transition">
                 <Database className="w-4 h-4" />
               </div>
-              <div className="text-xs font-bold text-[#1c232f]">Divisions Master</div>
+              <div className="text-xs font-bold text-[#1c232f]">
+                Divisions Master
+              </div>
               <div className="text-[11px] text-gray-400 mt-0.5">
                 Manage industrial pillars ({divisions.length})
               </div>
@@ -321,7 +327,9 @@ export default function Dashboard({ onNavigateTab }) {
             <div className="w-9 h-9 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center mb-2.5 group-hover:scale-105 transition">
               <Plane className="w-4 h-4" />
             </div>
-            <div className="text-xs font-bold text-[#1c232f]">Products Catalog</div>
+            <div className="text-xs font-bold text-[#1c232f]">
+              Products Catalog
+            </div>
             <div className="text-[11px] text-gray-400 mt-0.5">
               Aerospace, Defence & more ({products.length})
             </div>
@@ -334,7 +342,9 @@ export default function Dashboard({ onNavigateTab }) {
             <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center mb-2.5 group-hover:scale-105 transition">
               <ShieldCheck className="w-4 h-4" />
             </div>
-            <div className="text-xs font-bold text-[#1c232f]">Admin Personnel</div>
+            <div className="text-xs font-bold text-[#1c232f]">
+              Admin Personnel
+            </div>
             <div className="text-[11px] text-gray-400 mt-0.5">
               Super Admin & Normal Admin
             </div>
@@ -351,7 +361,8 @@ export default function Dashboard({ onNavigateTab }) {
                 Recent Commercial & Technical Inquiries
               </h2>
               <p className="text-xs text-gray-500">
-                Live incoming procurement and technical specifications inquiries (Super Admin Exclusive).
+                Live incoming procurement and technical specifications inquiries
+                (Super Admin Exclusive).
               </p>
             </div>
 
@@ -392,9 +403,12 @@ export default function Dashboard({ onNavigateTab }) {
               <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-2">
                 <Mail className="w-5 h-5" />
               </div>
-              <h3 className="text-sm font-bold text-gray-700">No Inquiries Available</h3>
+              <h3 className="text-sm font-bold text-gray-700">
+                No Inquiries Available
+              </h3>
               <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
-                No customer inquiries or procurement tenders have been ingested yet.
+                No customer inquiries or procurement tenders have been ingested
+                yet.
               </p>
             </div>
           ) : (
@@ -414,12 +428,17 @@ export default function Dashboard({ onNavigateTab }) {
                 </thead>
                 <tbody className="divide-y divide-[#f1f4f8]">
                   {displayedLeads.slice(0, 5).map((lead) => (
-                    <tr key={lead.id} className="hover:bg-[#f8fafc] transition-colors">
+                    <tr
+                      key={lead.id}
+                      className="hover:bg-[#f8fafc] transition-colors"
+                    >
                       <td className="py-3 px-3 font-mono font-medium text-gray-700">
                         {lead.id}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="font-semibold text-[#1c232f]">{lead.name}</div>
+                        <div className="font-semibold text-[#1c232f]">
+                          {lead.name}
+                        </div>
                         <div className="text-[10px] text-gray-400">
                           {lead.company} ({lead.country})
                         </div>
@@ -438,7 +457,9 @@ export default function Dashboard({ onNavigateTab }) {
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="text-gray-600 font-medium">{lead.category}</span>
+                        <span className="text-gray-600 font-medium">
+                          {lead.category}
+                        </span>
                       </td>
                       <td className="py-3 px-3">
                         <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
@@ -477,7 +498,8 @@ export default function Dashboard({ onNavigateTab }) {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                Manage products, imagery, and specifications across all configured industrial pillars.
+                Manage products, imagery, and specifications across all
+                configured industrial pillars.
               </p>
             </div>
 
@@ -500,51 +522,55 @@ export default function Dashboard({ onNavigateTab }) {
                 const divProductsCount = products.filter(
                   (p) => p.division === div.name
                 ).length;
-              return (
-                <div
-                  key={div.id}
-                  className="bg-[#f8fafc] rounded-xl border border-[#e2e8f0] p-4 flex flex-col justify-between hover:shadow-sm transition"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#105784]">
-                        {div.name}
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        ● {div.status || "Active"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2 line-clamp-2">
-                      {div.description}
-                    </p>
-                    <div className="text-lg font-bold text-[#1c232f] mt-3">
-                      {divProductsCount}{" "}
-                      <span className="text-xs font-normal text-gray-400">
-                        Products
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (onNavigateTab) {
-                        const targetSlug =
-                          div.slug === "aerospace"
-                            ? "products-aerospace"
-                            : div.slug === "defence"
-                            ? "products-defence"
-                            : `products-${div.slug || div.name.toLowerCase().replace(/\s+/g, "-")}`;
-                        onNavigateTab(targetSlug);
-                      }
-                    }}
-                    className="mt-4 pt-3 border-t border-gray-200/80 text-xs font-bold text-[#105784] hover:underline flex items-center gap-1 cursor-pointer"
+                return (
+                  <div
+                    key={div.id}
+                    className="bg-[#f8fafc] rounded-xl border border-[#e2e8f0] p-4 flex flex-col justify-between hover:shadow-sm transition"
                   >
-                    <span>Open {div.name}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            }))}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#105784]">
+                          {div.name}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ● {div.status || "Active"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                        {div.description}
+                      </p>
+                      <div className="text-lg font-bold text-[#1c232f] mt-3">
+                        {divProductsCount}{" "}
+                        <span className="text-xs font-normal text-gray-400">
+                          Products
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (onNavigateTab) {
+                          const targetSlug =
+                            div.slug === "aerospace"
+                              ? "products-aerospace"
+                              : div.slug === "defence"
+                              ? "products-defence"
+                              : `products-${
+                                  div.slug ||
+                                  div.name.toLowerCase().replace(/\s+/g, "-")
+                                }`;
+                          onNavigateTab(targetSlug);
+                        }
+                      }}
+                      className="mt-4 pt-3 border-t border-gray-200/80 text-xs font-bold text-[#105784] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Open {div.name}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -581,23 +607,33 @@ export default function Dashboard({ onNavigateTab }) {
 
             <div className="bg-[#f8fafc] p-3 rounded-lg border border-[#e2e8f0] text-xs space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 font-semibold">Inquired Product:</span>
+                <span className="text-gray-500 font-semibold">
+                  Inquired Product:
+                </span>
                 <span className="font-bold text-[#105784]">
                   {selectedLead.productInquired}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 font-semibold">Division:</span>
-                <span className="font-bold text-gray-800">{selectedLead.category}</span>
+                <span className="font-bold text-gray-800">
+                  {selectedLead.category}
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 font-semibold">Lead Priority:</span>
-                <span className="font-bold text-amber-700">{selectedLead.priority}</span>
+                <span className="text-gray-500 font-semibold">
+                  Lead Priority:
+                </span>
+                <span className="font-bold text-amber-700">
+                  {selectedLead.priority}
+                </span>
               </div>
             </div>
 
             <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-200 leading-relaxed">
-              <strong className="block text-gray-700 mb-1">Message Content:</strong>
+              <strong className="block text-gray-700 mb-1">
+                Message Content:
+              </strong>
               {selectedLead.message}
             </div>
 
