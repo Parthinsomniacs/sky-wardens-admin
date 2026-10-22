@@ -8,8 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import ContactLeads from "./pages/ContactLeads";
 import ProductsPage from "./pages/ProductsPage";
 import AdminUsers from "./pages/AdminUsers";
-
 import MastersPage from "./pages/MastersPage";
+import Profile from "./pages/Profile";
 
 const VALID_TABS = [
   "dashboard",
@@ -22,6 +22,7 @@ const VALID_TABS = [
   "products-petrochemicals",
   "masters",
   "users",
+  "profile",
 ];
 
 const isValidTab = (tab) => {
@@ -31,7 +32,7 @@ const isValidTab = (tab) => {
 };
 
 function AppContent() {
-  const { isAuthenticated, isSuperAdmin } = useAuth();
+  const { isAuthenticated, user, isSuperAdmin } = useAuth();
 
   const [currentTab, setCurrentTab] = useState(() => {
     const hash = window.location.hash.replace("#", "");
@@ -60,6 +61,9 @@ function AppContent() {
   }
 
   const renderCurrentModule = () => {
+    if (currentTab === "profile") {
+      return <Profile onNavigateTab={handleTabChange} />;
+    }
     if (currentTab === "masters") {
       return <MastersPage onNavigateTab={handleTabChange} />;
     }
@@ -94,7 +98,7 @@ function AppContent() {
       return <ContactLeads />;
     }
     if (currentTab === "users") {
-      return <AdminUsers />;
+      return <AdminUsers onNavigateTab={handleTabChange} />;
     }
     if (currentTab.startsWith("products-") || currentTab === "products") {
       let initialDivision = "Aerospace";
@@ -110,10 +114,18 @@ function AppContent() {
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(" ");
       }
+      const isDivisionSpecific =
+        currentTab === "products-aerospace"
+          ? "Aerospace"
+          : currentTab === "products-defence"
+          ? "Defence"
+          : initialDivision;
+
       return (
         <ProductsPage
           key={currentTab}
           initialDivision={initialDivision}
+          lockedDivision={isDivisionSpecific}
           onNavigateTab={handleTabChange}
         />
       );
@@ -122,18 +134,18 @@ function AppContent() {
   };
 
   return (
-    <AdminLayout currentTab={currentTab} onTabChange={handleTabChange}>
-      {renderCurrentModule()}
-    </AdminLayout>
+    <ProductsProvider key={user?.id || user?.email || "auth-session"}>
+      <AdminLayout currentTab={currentTab} onTabChange={handleTabChange}>
+        {renderCurrentModule()}
+      </AdminLayout>
+    </ProductsProvider>
   );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <ProductsProvider>
-        <AppContent />
-      </ProductsProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

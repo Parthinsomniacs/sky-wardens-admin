@@ -1,9 +1,23 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { productsApi, divisionsApi } from "../services/api";
+import { AEROSPACE_CATEGORIES, DEFENCE_CATEGORIES } from "../data/productsData";
 
 export const INITIAL_DIVISIONS = [];
-export const INITIAL_CATEGORIES = [];
+export const INITIAL_CATEGORIES = [
+  ...AEROSPACE_CATEGORIES.map((c) => ({
+    id: c.id,
+    name: c.name,
+    division: "Aerospace",
+    tagline: c.tagline || `${c.name} series`,
+  })),
+  ...DEFENCE_CATEGORIES.map((c) => ({
+    id: c.id,
+    name: c.name,
+    division: "Defence",
+    tagline: c.tagline || `${c.name} series`,
+  })),
+];
 
 const ProductsContext = createContext(null);
 
@@ -17,12 +31,20 @@ const normalizeDivision = (d) => ({
   color: d.color || "#105784",
   badgeColor: d.badgeColor || "bg-indigo-600",
   status: d.status || "Active",
+  sector: d.sector || "",
+  buttonText: d.buttonText || "",
+  imageSrc: d.imageSrc || "",
+  imageAlt: d.imageAlt || "",
+  logoSrc: d.logoSrc || "",
+  logoAlt: d.logoAlt || "",
+  href: d.href || (d.slug ? `/products/${d.slug}` : ""),
+  order: typeof d.order === "number" ? d.order : 0,
   createdAt: d.createdAt,
 });
 
 export function ProductsProvider({ children }) {
   const [divisions, setDivisions] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(INITIAL_CATEGORIES);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,10 +57,17 @@ export function ProductsProvider({ children }) {
           console.warn("Divisions API load error:", err.message);
           return [];
         }),
-        productsApi.getAllAdmin().catch((err) => {
-          console.warn("Products API load error:", err.message);
-          return [];
-        }),
+        productsApi
+          .getAllAdmin()
+          .catch(async (err) => {
+            console.warn("Products admin API load error, falling back to public API:", err.message);
+            try {
+              const pub = await productsApi.getPublic();
+              return Array.isArray(pub) ? pub : [];
+            } catch {
+              return [];
+            }
+          }),
       ]);
 
       if (Array.isArray(fetchedDivisions) && fetchedDivisions.length > 0) {
@@ -50,8 +79,12 @@ export function ProductsProvider({ children }) {
       if (Array.isArray(fetchedProducts)) {
         setProducts(fetchedProducts);
 
-        // Derive unique category definitions dynamically
+        // Derive unique category definitions dynamically (always preserve master categories)
         const catMap = new Map();
+        INITIAL_CATEGORIES.forEach((c) => {
+          catMap.set(c.id, c);
+        });
+
         fetchedProducts.forEach((p) => {
           if (p.categoryId && !catMap.has(p.categoryId)) {
             catMap.set(p.categoryId, {
@@ -65,7 +98,7 @@ export function ProductsProvider({ children }) {
         setCategories(Array.from(catMap.values()));
       } else {
         setProducts([]);
-        setCategories([]);
+        setCategories(INITIAL_CATEGORIES);
       }
     } catch (err) {
       console.error("Error fetching catalog from backend:", err);
@@ -91,6 +124,14 @@ export function ProductsProvider({ children }) {
         description: newDiv.description?.trim() || "",
         status: newDiv.status || "Active",
         badgeColor: newDiv.badgeColor || "bg-indigo-600",
+        sector: newDiv.sector?.trim() || "",
+        buttonText: newDiv.buttonText?.trim() || "",
+        imageSrc: newDiv.imageSrc?.trim() || "",
+        imageAlt: newDiv.imageAlt?.trim() || "",
+        logoSrc: newDiv.logoSrc?.trim() || "",
+        logoAlt: newDiv.logoAlt?.trim() || "",
+        href: newDiv.href?.trim() || "",
+        order: typeof newDiv.order === "number" ? newDiv.order : 0,
       });
       const normalized = normalizeDivision(created);
       setDivisions((prev) => {
@@ -102,9 +143,7 @@ export function ProductsProvider({ children }) {
       return normalized;
     } catch (err) {
       console.error("Failed to add division in backend:", err);
-      const local = normalizeDivision(newDiv);
-      setDivisions((prev) => [...prev, local]);
-      return local;
+      throw err;
     }
   };
 
@@ -155,27 +194,7 @@ export function ProductsProvider({ children }) {
       return normalized;
     } catch (err) {
       console.error("Failed to update division in backend:", err);
-      setDivisions((prev) =>
-        prev.map((d) =>
-          d.id === id || d._id === id || d.name === id ? { ...d, ...updatedFields } : d
-        )
-      );
-
-      if (updatedFields.status) {
-        const targetDiv = divisions.find(
-          (d) => d.id === id || d._id === id || d.name === id
-        );
-        const divName = targetDiv?.name || updatedFields.name;
-        if (divName) {
-          setProducts((prev) =>
-            prev.map((p) =>
-              p.division?.toLowerCase() === divName.toLowerCase()
-                ? { ...p, status: updatedFields.status }
-                : p
-            )
-          );
-        }
-      }
+      throw err;
     }
   };
 
@@ -185,11 +204,10 @@ export function ProductsProvider({ children }) {
       setDivisions((prev) =>
         prev.filter((d) => d.id !== id && d._id !== id && d.name !== id)
       );
+      return true;
     } catch (err) {
       console.error("Failed to delete division in backend:", err);
-      setDivisions((prev) =>
-        prev.filter((d) => d.id !== id && d._id !== id && d.name !== id)
-      );
+      throw err;
     }
   };
 

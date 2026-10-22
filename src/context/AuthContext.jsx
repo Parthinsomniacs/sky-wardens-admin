@@ -34,61 +34,57 @@ export function AuthProvider({ children }) {
     return DEFAULT_SUPER_ADMIN;
   });
 
-  // Verify token on initial mount if authenticated
+  // Verify token on initial mount
   useEffect(() => {
     const token = localStorage.getItem("sky_wardens_token");
     if (token) {
       authApi
         .getMe()
         .then((res) => {
-          if (res.user) {
+          if (res?.user) {
             setUser(res.user);
+            setIsAuthenticated(true);
+            localStorage.setItem("sky_wardens_auth", "true");
             localStorage.setItem("sky_wardens_user", JSON.stringify(res.user));
+          } else {
+            logout();
           }
         })
         .catch(() => {
-          console.warn("Session check fallback to cached user");
+          logout();
         });
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
+      localStorage.removeItem("sky_wardens_auth");
+      localStorage.removeItem("sky_wardens_user");
     }
   }, []);
 
-  const login = async (email, password = "SkyWardens@2026") => {
-    try {
-      // 1. Try real backend API
-      const res = await authApi.login({ email, password });
-      if (res.success && res.token) {
-        localStorage.setItem("sky_wardens_token", res.token);
-        localStorage.setItem("sky_wardens_auth", "true");
-        localStorage.setItem("sky_wardens_user", JSON.stringify(res.user));
-        setUser(res.user);
-        setIsAuthenticated(true);
-        return res;
-      }
-    } catch (err) {
-      // If network fails or fallback needed
-      console.warn("Backend API auth failed, falling back to local session:", err.message);
-      const isSuper = email.toLowerCase().includes("admin@") || !email.includes("malhotra");
-      const fallbackUser = {
-        ...DEFAULT_SUPER_ADMIN,
-        email,
-        name: isSuper ? "Super Admin" : "Wing Cdr. Vikram Malhotra (Retd.)",
-        role: isSuper ? "Super Admin" : "Normal Admin",
-        clearance: isSuper ? "Full System Access (Includes Leads)" : "Operational Access (No Leads)",
-        avatar: isSuper ? "SA" : "VM",
-      };
-      setIsAuthenticated(true);
-      setUser(fallbackUser);
+  const login = async (email, password) => {
+    const cleanEmail = email?.trim().toLowerCase();
+    const cleanPassword = password;
+
+    // Strict authentication against backend API
+    const res = await authApi.login({ email: cleanEmail, password: cleanPassword });
+    if (res && res.success && res.token) {
+      localStorage.setItem("sky_wardens_token", res.token);
       localStorage.setItem("sky_wardens_auth", "true");
-      localStorage.setItem("sky_wardens_user", JSON.stringify(fallbackUser));
-      return { success: true, user: fallbackUser };
+      localStorage.setItem("sky_wardens_user", JSON.stringify(res.user));
+      setUser(res.user);
+      setIsAuthenticated(true);
+      return res;
     }
+    throw new Error(res?.message || "Invalid credentials.");
   };
 
   const logout = () => {
     setIsAuthenticated(false);
+    setUser(null);
     localStorage.removeItem("sky_wardens_auth");
     localStorage.removeItem("sky_wardens_token");
     localStorage.removeItem("sky_wardens_user");
+    localStorage.removeItem("sky_wardens_saved_password");
   };
 
   const switchRole = async (newRole) => {
@@ -124,6 +120,30 @@ export function AuthProvider({ children }) {
     });
   };
 
+  const updateUserProfile = async (updates) => {
+    const res = await authApi.updateProfile(updates);
+    if (res.success && res.user) {
+      setUser((prev) => {
+        const merged = { ...prev, ...res.user };
+        localStorage.setItem("sky_wardens_user", JSON.stringify(merged));
+        return merged;
+      });
+      if (updates.email) {
+        localStorage.setItem("sky_wardens_saved_email", updates.email);
+      }
+      return res;
+    }
+    return res;
+  };
+
+  const changePassword = async (payload) => {
+    const res = await authApi.changePassword(payload);
+    if (res.success) {
+      localStorage.removeItem("sky_wardens_saved_password");
+    }
+    return res;
+  };
+
   const isSuperAdmin = user?.role === "Super Admin";
 
   return (
@@ -135,6 +155,8 @@ export function AuthProvider({ children }) {
         login,
         logout,
         switchRole,
+        updateUserProfile,
+        changePassword,
       }}
     >
       {children}

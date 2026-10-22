@@ -129,12 +129,17 @@ export default function ProductInquiryLeads() {
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentLeads = filteredLeads.slice(startIndex, endIndex);
 
-  const handleStatusChange = (leadId, newStatus) => {
+  const handleStatusChange = async (leadId, newStatus) => {
     setLeads((prev) =>
       prev.map((lead) => (lead.id === leadId ? { ...lead, status: newStatus } : lead))
     );
     if (selectedLead && selectedLead.id === leadId) {
       setSelectedLead((prev) => ({ ...prev, status: newStatus }));
+    }
+    try {
+      await leadsApi.updateStatus(leadId, newStatus);
+    } catch (err) {
+      console.warn("Product lead status sync error:", err.message);
     }
   };
 
@@ -436,25 +441,36 @@ export default function ProductInquiryLeads() {
                         {lead.priority}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <select
-                        value={lead.status}
-                        onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                        className={`text-[11px] font-bold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none ${
-                          lead.status === "New"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : lead.status === "In Discussion"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : lead.status === "Contacted"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                        }`}
-                      >
-                        <option value="New">● New</option>
-                        <option value="In Discussion">● In Discussion</option>
-                        <option value="Contacted">● Contacted</option>
-                        <option value="Converted">● Converted</option>
-                      </select>
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={lead.status || "New"}
+                          onChange={(e) => handleStatusChange(lead.id || lead._id, e.target.value)}
+                          aria-label={`Update status for product lead ${lead.id}`}
+                          className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all shadow-2xs ${
+                            lead.status === "New"
+                              ? "bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-400 hover:bg-amber-100/70"
+                              : lead.status === "In Discussion"
+                              ? "bg-blue-50 text-blue-800 border-blue-300 focus:ring-blue-400 hover:bg-blue-100/70"
+                              : lead.status === "Contacted"
+                              ? "bg-purple-50 text-purple-800 border-purple-300 focus:ring-purple-400 hover:bg-purple-100/70"
+                              : lead.status === "Converted"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-400 hover:bg-emerald-100/70"
+                              : "bg-gray-100 text-gray-700 border-gray-300 focus:ring-gray-400 hover:bg-gray-200/70"
+                          }`}
+                        >
+                          <option value="New">● New</option>
+                          <option value="In Discussion">● In Discussion</option>
+                          <option value="Contacted">● Contacted</option>
+                          <option value="Converted">● Converted</option>
+                          <option value="Closed">● Closed</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-current opacity-60">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-gray-500 text-[11px] whitespace-nowrap">
                       {lead.date}
@@ -590,41 +606,53 @@ export default function ProductInquiryLeads() {
               </div>
             </div>
 
-            {/* Client Profile Grid */}
-            <div className="grid grid-cols-2 gap-3 text-xs p-3.5 bg-gray-50 rounded-lg border border-gray-100">
-              <div>
-                <span className="text-gray-400 block text-[11px]">Authorized Representative</span>
-                <span className="font-bold text-gray-900 text-xs">{selectedLead.name}</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block text-[11px]">Organization / Directorate</span>
-                <span className="font-bold text-gray-900 text-xs">{selectedLead.company}</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block text-[11px]">Corporate / Defense Email</span>
-                <a
-                  href={`mailto:${selectedLead.email}`}
-                  className="font-bold text-[#105784] hover:underline"
-                >
-                  {selectedLead.email}
-                </a>
-              </div>
-              <div>
-                <span className="text-gray-400 block text-[11px]">Secure Contact Line</span>
-                <span className="font-bold text-gray-900">{selectedLead.phone}</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block text-[11px]">Jurisdiction / Location</span>
-                <span className="font-bold text-gray-900">
-                  {[selectedLead.city, selectedLead.state, selectedLead.country]
-                    .filter(Boolean)
-                    .join(", ")}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-400 block text-[11px]">Received Timestamp</span>
-                <span className="font-bold text-gray-900">{selectedLead.timestamp}</span>
-              </div>
+            {/* Client Profile Grid - Only non-empty fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs p-3.5 bg-gray-50 rounded-lg border border-gray-100">
+              {selectedLead.name && selectedLead.name.trim() !== "" && (
+                <div>
+                  <span className="text-gray-400 block text-[11px]">Authorized Representative</span>
+                  <span className="font-bold text-gray-900 text-xs">{selectedLead.name}</span>
+                </div>
+              )}
+              {selectedLead.company && selectedLead.company.trim() !== "" && (
+                <div>
+                  <span className="text-gray-400 block text-[11px]">Organization / Directorate</span>
+                  <span className="font-bold text-gray-900 text-xs">{selectedLead.company}</span>
+                </div>
+              )}
+              {selectedLead.email && selectedLead.email.trim() !== "" && (
+                <div>
+                  <span className="text-gray-400 block text-[11px]">Corporate / Defense Email</span>
+                  <a
+                    href={`mailto:${selectedLead.email}`}
+                    className="font-bold text-[#105784] hover:underline break-all"
+                  >
+                    {selectedLead.email}
+                  </a>
+                </div>
+              )}
+              {selectedLead.phone && selectedLead.phone.trim() !== "" && (
+                <div>
+                  <span className="text-gray-400 block text-[11px]">Secure Contact Line</span>
+                  <span className="font-bold text-gray-900">{selectedLead.phone}</span>
+                </div>
+              )}
+              {[selectedLead.city, selectedLead.state, selectedLead.country].filter(Boolean).length > 0 && (
+                <div>
+                  <span className="text-gray-400 block text-[11px]">Jurisdiction / Location</span>
+                  <span className="font-bold text-gray-900">
+                    {[selectedLead.city, selectedLead.state, selectedLead.country]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </span>
+                </div>
+              )}
+              {selectedLead.timestamp && (
+                <div>
+                  <span className="text-gray-400 block text-[11px]">Received Timestamp</span>
+                  <span className="font-bold text-gray-900">{selectedLead.timestamp}</span>
+                </div>
+              )}
 
               {/* Dynamic Inquiry Details */}
               {selectedLead.tenderReference && (

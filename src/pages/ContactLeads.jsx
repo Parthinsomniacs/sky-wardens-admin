@@ -19,20 +19,39 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { INITIAL_LEADS, CONTACT_TYPES } from "../data/mockData";
 import { leadsApi } from "../services/api";
+
+const formatDateTime = (lead) => {
+  if (!lead) return "—";
+  const raw = lead.createdAt || lead.timestamp || lead.date;
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+  return lead.date || raw;
+};
 
 export default function ContactLeads() {
   const [leads, setLeads] = useState(INITIAL_LEADS);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
   const [exportNotice, setExportNotice] = useState(false);
+  const [statusToast, setStatusToast] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -73,11 +92,24 @@ export default function ContactLeads() {
 
   const handleStatusChange = async (leadId, newStatus) => {
     setLeads((prev) =>
-      prev.map((lead) => (lead.id === leadId ? { ...lead, status: newStatus } : lead))
+      prev.map((lead) =>
+        lead.id === leadId || lead._id === leadId
+          ? { ...lead, status: newStatus }
+          : lead
+      )
     );
-    if (selectedLead && selectedLead.id === leadId) {
+    if (
+      selectedLead &&
+      (selectedLead.id === leadId || selectedLead._id === leadId)
+    ) {
       setSelectedLead((prev) => ({ ...prev, status: newStatus }));
     }
+
+    const currentLead = leads.find((l) => l.id === leadId || l._id === leadId);
+    const leadLabel = currentLead?.name ? `${currentLead.name} (${currentLead.id || leadId})` : `Lead #${leadId}`;
+    setStatusToast(`Updated ${leadLabel} to "${newStatus}"`);
+    setTimeout(() => setStatusToast(null), 3500);
+
     try {
       await leadsApi.updateStatus(leadId, newStatus);
     } catch (err) {
@@ -91,7 +123,7 @@ export default function ContactLeads() {
     const rows = filteredLeads
       .map(
         (l) =>
-          `"${l.id}","${l.name}","${l.email}","${l.phone}","${l.company}","${l.country}","${l.type}","${l.productInquired}","${l.category}","${l.status}","${l.priority}","${l.date}"`
+          `"${l.id}","${l.name}","${l.email}","${l.phone}","${l.company}","${l.country}","${l.type}","${l.productInquired}","${l.category}","${l.status}","${l.priority}","${formatDateTime(l)}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
@@ -110,14 +142,7 @@ export default function ContactLeads() {
   };
 
   const filteredLeads = leads.filter((lead) => {
-    const matchesCategory =
-      categoryFilter === "all" ||
-      (categoryFilter === "aerospace" && lead.category === "Aerospace") ||
-      (categoryFilter === "defence" && lead.category === "Defence") ||
-      (categoryFilter === "general" && lead.category === "General");
-
     const matchesType = typeFilter === "all" || lead.type === typeFilter;
-
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
 
     const q = searchQuery.toLowerCase().trim();
@@ -130,7 +155,7 @@ export default function ContactLeads() {
       lead.type.toLowerCase().includes(q) ||
       lead.id.toLowerCase().includes(q);
 
-    return matchesCategory && matchesType && matchesStatus && matchesSearch;
+    return matchesType && matchesStatus && matchesSearch;
   });
 
   // Pagination calculation (10 leads per page)
@@ -246,6 +271,21 @@ export default function ContactLeads() {
         </div>
       )}
 
+      {statusToast && (
+        <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 text-xs rounded-lg flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="font-semibold">{statusToast}</span>
+          </div>
+          <button
+            onClick={() => setStatusToast(null)}
+            className="text-blue-500 hover:text-blue-800 p-0.5 rounded cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#e9ecef] shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06)] border-l-4 border-l-[#105784]">
@@ -298,49 +338,24 @@ export default function ContactLeads() {
       {/* Main Table Card */}
       <div className="bg-white rounded-xl border border-[#e9ecef] shadow-[0_2px_6px_-1px_rgba(0,0,0,0.08)] p-5 sm:p-6 space-y-4">
         {/* Filters and Search Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          {/* Division Tabs */}
-          <div className="flex flex-wrap items-center gap-1 bg-[#f4f7fa] p-1 rounded-lg border border-[#e2e8f0]">
-            {[
-              { id: "all", label: "All Divisions" },
-              { id: "aerospace", label: "Aerospace" },
-              { id: "defence", label: "Defence" },
-              { id: "general", label: "Institutional / General" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setCategoryFilter(tab.id);
-                  setCurrentPage(1);
-                }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer ${
-                  categoryFilter === tab.id
-                    ? "bg-white text-[#105784] shadow-2xs font-bold"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search leads, names, email..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white"
+            />
           </div>
 
-          {/* Search, Contact Type & Status Filters */}
+          {/* Contact Type & Status Filters */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search Input */}
-            <div className="relative w-full sm:w-56">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search leads, names, email..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white"
-              />
-            </div>
-
             {/* Official Contact Type Filter Dropdown */}
             <select
               value={typeFilter}
@@ -350,7 +365,7 @@ export default function ContactLeads() {
               }}
               className="px-2.5 py-1.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-lg text-gray-700 font-medium focus:outline-none focus:border-[#105784] cursor-pointer"
             >
-              <option value="all">All Contact Types ({leads.length})</option>
+              <option value="all">Choose Enquiry</option>
               {CONTACT_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -386,7 +401,6 @@ export default function ContactLeads() {
                 <th className="py-3 px-3.5">Client Contact</th>
                 <th className="py-3 px-3.5">Contact Type</th>
                 <th className="py-3 px-3.5">Inquired Product / Subject</th>
-                <th className="py-3 px-3.5">Division</th>
                 <th className="py-3 px-3.5">Status</th>
                 <th className="py-3 px-3.5">Date</th>
                 <th className="py-3 px-3.5 text-right">Action</th>
@@ -395,7 +409,7 @@ export default function ContactLeads() {
             <tbody className="divide-y divide-[#f1f4f8]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-gray-400">
+                  <td colSpan={7} className="py-10 text-center text-gray-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-4 h-4 border-2 border-[#105784] border-t-transparent rounded-full animate-spin" />
                       <span>Loading inquiries...</span>
@@ -404,7 +418,7 @@ export default function ContactLeads() {
                 </tr>
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
                     <p className="text-sm font-medium text-gray-500">No contact leads found</p>
                     <p className="text-xs text-gray-400 mt-1">
                       New inquiries submitted from the website will appear here in real time.
@@ -425,13 +439,17 @@ export default function ContactLeads() {
                     {/* Contact Person */}
                     <td className="py-3.5 px-3.5">
                       <div className="font-semibold text-[#1c232f]">{lead.name}</div>
-                      <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3 h-3 text-gray-400 shrink-0" />
-                        <span>{lead.email}</span>
-                      </div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">
-                        {lead.company} ({lead.country})
-                      </div>
+                      {lead.email && (
+                        <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1 mt-0.5">
+                          <Mail className="w-3 h-3 text-gray-400 shrink-0" />
+                          <span>{lead.email}</span>
+                        </div>
+                      )}
+                      {[lead.company, lead.country].filter(Boolean).length > 0 && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">
+                          {[lead.company, lead.country].filter(Boolean).join(" • ")}
+                        </div>
+                      )}
                     </td>
 
                     {/* Contact Type Column */}
@@ -456,65 +474,54 @@ export default function ContactLeads() {
                       </p>
                     </td>
 
-                    {/* Category Badge */}
+                    {/* Realtime Status Dropdown */}
                     <td className="py-3.5 px-3.5 whitespace-nowrap">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                          lead.category === "Aerospace"
-                            ? "bg-sky-50 text-sky-700 border border-sky-200"
-                            : lead.category === "Defence"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-gray-100 text-gray-600 border border-gray-200"
-                        }`}
-                      >
-                        {lead.category}
-                      </span>
-                    </td>
-
-                    {/* Status Pill */}
-                    <td className="py-3.5 px-3.5 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          lead.status === "New"
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : lead.status === "In Discussion"
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : lead.status === "Contacted"
-                            ? "bg-purple-50 text-purple-700 border border-purple-200"
-                            : lead.status === "Converted"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
+                      <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={lead.status || "New"}
+                          onChange={(e) =>
+                            handleStatusChange(lead.id || lead._id, e.target.value)
+                          }
+                          aria-label={`Update status for lead ${lead.id}`}
+                          className={`text-[11px] font-bold pl-2.5 pr-6 py-1 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all shadow-2xs ${
                             lead.status === "New"
-                              ? "bg-amber-500"
+                              ? "bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-400 hover:bg-amber-100/70"
                               : lead.status === "In Discussion"
-                              ? "bg-blue-500"
+                              ? "bg-blue-50 text-blue-800 border-blue-300 focus:ring-blue-400 hover:bg-blue-100/70"
                               : lead.status === "Contacted"
-                              ? "bg-purple-500"
+                              ? "bg-purple-50 text-purple-800 border-purple-300 focus:ring-purple-400 hover:bg-purple-100/70"
                               : lead.status === "Converted"
-                              ? "bg-emerald-500"
-                              : "bg-gray-400"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-400 hover:bg-emerald-100/70"
+                              : "bg-gray-100 text-gray-700 border-gray-300 focus:ring-gray-400 hover:bg-gray-200/70"
                           }`}
-                        />
-                        {lead.status}
-                      </span>
+                        >
+                          <option value="New">● New</option>
+                          <option value="In Discussion">● In Discussion</option>
+                          <option value="Contacted">● Contacted</option>
+                          <option value="Converted">● Converted</option>
+                          <option value="Closed">● Closed</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-current opacity-60">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
                     </td>
 
-                    {/* Date */}
-                    <td className="py-3.5 px-3.5 text-gray-500 text-[11px] whitespace-nowrap">
-                      {lead.date}
+                    {/* Date with Proper Timestamp */}
+                    <td className="py-3.5 px-3.5 text-gray-600 text-[11px] whitespace-nowrap font-medium">
+                      {formatDateTime(lead)}
                     </td>
 
                     {/* Action */}
                     <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
                       <button
                         onClick={() => setSelectedLead(lead)}
-                        className="px-2.5 py-1 text-xs font-semibold text-[#105784] hover:bg-[#105784] hover:text-white rounded border border-[#105784]/30 transition cursor-pointer"
+                        className="p-1.5 text-[#105784] hover:bg-[#105784]/10 rounded border border-[#105784]/30 transition cursor-pointer inline-flex items-center justify-center"
+                        title="View Lead"
                       >
-                        View Lead
+                        <Eye className="w-3.5 h-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -598,19 +605,8 @@ export default function ContactLeads() {
             <div className="flex items-start justify-between pb-3 border-b border-gray-100">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#105784]">
-                    {selectedLead.id}
-                  </span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                      selectedLead.category === "Aerospace"
-                        ? "bg-sky-50 text-sky-700"
-                        : selectedLead.category === "Defence"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {selectedLead.category}
+                  <span className="text-xs font-mono font-bold text-[#105784] bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                    Lead #{selectedLead.id}
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-[#1c232f] mt-1">
@@ -633,64 +629,80 @@ export default function ContactLeads() {
                 </span>
                 {renderContactTypeBadge(selectedLead.type)}
               </div>
-              <div>
-                <span className="text-[10px] font-bold text-[#105784] uppercase tracking-wider block">
-                  Inquired Equipment / Scope
-                </span>
-                <p className="text-sm font-bold text-[#1c232f] mt-0.5">
-                  {selectedLead.productInquired}
-                </p>
-                <span className="text-[11px] text-gray-500">
-                  Division: {selectedLead.category} Solutions
-                </span>
-              </div>
+              {selectedLead.productInquired && selectedLead.productInquired.trim() !== "" && (
+                <div>
+                  <span className="text-[10px] font-bold text-[#105784] uppercase tracking-wider block">
+                    Inquired Equipment / Scope
+                  </span>
+                  <p className="text-sm font-bold text-[#1c232f] mt-0.5">
+                    {selectedLead.productInquired}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Client Info Grid */}
-            <div className="grid grid-cols-2 gap-3 text-xs p-3.5 bg-gray-50 rounded-lg">
-              <div>
-                <span className="text-gray-500 block text-[11px]">Contact Person</span>
-                <span className="font-bold text-gray-900">{selectedLead.name}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-[11px]">Organization / Directorate</span>
-                <span className="font-bold text-gray-900">{selectedLead.company}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-[11px]">Email Address</span>
-                <a
-                  href={`mailto:${selectedLead.email}`}
-                  className="font-bold text-[#105784] hover:underline"
-                >
-                  {selectedLead.email}
-                </a>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-[11px]">Phone Number</span>
-                <a
-                  href={`tel:${selectedLead.phone}`}
-                  className="font-bold text-gray-900 hover:underline flex items-center gap-1"
-                >
-                  <Phone className="w-3 h-3 text-gray-400" />
-                  <span>{selectedLead.phone}</span>
-                </a>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-[11px]">Location / Jurisdiction</span>
-                <span className="font-bold text-gray-900">
-                  {[selectedLead.city, selectedLead.state, selectedLead.country]
-                    .filter(Boolean)
-                    .join(", ")}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-[11px]">Submission Time</span>
-                <span className="font-mono text-gray-700">{selectedLead.timestamp}</span>
-              </div>
+            {/* Client Info Grid - Dynamically renders only fields that have actual data */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs p-3.5 bg-gray-50 rounded-lg">
+              {selectedLead.name && selectedLead.name.trim() !== "" && (
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Contact Person</span>
+                  <span className="font-bold text-gray-900">{selectedLead.name}</span>
+                </div>
+              )}
+
+              {selectedLead.company && selectedLead.company.trim() !== "" && (
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Organization / Directorate</span>
+                  <span className="font-bold text-gray-900">{selectedLead.company}</span>
+                </div>
+              )}
+
+              {selectedLead.email && selectedLead.email.trim() !== "" && (
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Email Address</span>
+                  <a
+                    href={`mailto:${selectedLead.email}`}
+                    className="font-bold text-[#105784] hover:underline break-all"
+                  >
+                    {selectedLead.email}
+                  </a>
+                </div>
+              )}
+
+              {selectedLead.phone && selectedLead.phone.trim() !== "" && (
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Phone Number</span>
+                  <a
+                    href={`tel:${selectedLead.phone}`}
+                    className="font-bold text-gray-900 hover:underline flex items-center gap-1"
+                  >
+                    <Phone className="w-3 h-3 text-gray-400 shrink-0" />
+                    <span>{selectedLead.phone}</span>
+                  </a>
+                </div>
+              )}
+
+              {[selectedLead.city, selectedLead.state, selectedLead.country].filter(Boolean).length > 0 && (
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Location / Jurisdiction</span>
+                  <span className="font-bold text-gray-900">
+                    {[selectedLead.city, selectedLead.state, selectedLead.country]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </span>
+                </div>
+              )}
+
+              {formatDateTime(selectedLead) && formatDateTime(selectedLead) !== "—" && (
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Submission Time</span>
+                  <span className="font-mono text-gray-700">{formatDateTime(selectedLead)}</span>
+                </div>
+              )}
 
               {/* Dynamic Inquiry Fields */}
-              {selectedLead.tenderReference && (
-                <div className="col-span-2 pt-2 border-t border-gray-200">
+              {selectedLead.tenderReference && selectedLead.tenderReference.trim() !== "" && (
+                <div className="col-span-1 sm:col-span-2 pt-2 border-t border-gray-200">
                   <span className="text-gray-500 block text-[11px]">Tender Reference</span>
                   <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 inline-block mt-0.5">
                     {selectedLead.tenderReference}
@@ -698,8 +710,8 @@ export default function ContactLeads() {
                 </div>
               )}
 
-              {selectedLead.designation && (
-                <div className="col-span-2 pt-2 border-t border-gray-200">
+              {selectedLead.designation && selectedLead.designation.trim() !== "" && (
+                <div className="col-span-1 sm:col-span-2 pt-2 border-t border-gray-200">
                   <span className="text-gray-500 block text-[11px]">Official Designation</span>
                   <span className="font-bold text-gray-900">
                     {selectedLead.designation}
@@ -707,8 +719,8 @@ export default function ContactLeads() {
                 </div>
               )}
 
-              {selectedLead.mediaDeadline && (
-                <div className="col-span-2 pt-2 border-t border-gray-200">
+              {selectedLead.mediaDeadline && selectedLead.mediaDeadline.trim() !== "" && (
+                <div className="col-span-1 sm:col-span-2 pt-2 border-t border-gray-200">
                   <span className="text-gray-500 block text-[11px]">Media Response Deadline</span>
                   <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
                     📅 {selectedLead.mediaDeadline}
@@ -717,7 +729,7 @@ export default function ContactLeads() {
               )}
 
               {selectedLead.selectedProducts && selectedLead.selectedProducts.length > 0 && (
-                <div className="col-span-2 pt-2 border-t border-gray-200">
+                <div className="col-span-1 sm:col-span-2 pt-2 border-t border-gray-200">
                   <span className="text-gray-500 block text-[11px] mb-1.5">
                     Products of Interest ({selectedLead.selectedProducts.length})
                   </span>
@@ -736,14 +748,16 @@ export default function ContactLeads() {
             </div>
 
             {/* Inquirer Message */}
-            <div className="my-4">
-              <span className="text-xs font-semibold text-gray-600 block mb-1">
-                Client Requirement Message
-              </span>
-              <div className="p-3.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 leading-relaxed font-sans">
-                "{selectedLead.message}"
+            {selectedLead.message && selectedLead.message.trim() !== "" && (
+              <div className="my-4">
+                <span className="text-xs font-semibold text-gray-600 block mb-1">
+                  Client Requirement Message
+                </span>
+                <div className="p-3.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 leading-relaxed font-sans whitespace-pre-wrap">
+                  "{selectedLead.message}"
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Status Change Selector */}
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-xs">

@@ -241,55 +241,6 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          {/* Quick Autofill Demo Credentials */}
-          <div className="mt-5 pt-4 border-t border-gray-100">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-center mb-2.5">
-              Quick Access Credentials (Click to Autofill)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("admin@skywardens.com");
-                  setPassword("SkyWardens@2026");
-                  setErrorMessage("");
-                }}
-                className="p-2 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-slate-200 rounded-lg text-left text-[11px] transition cursor-pointer"
-              >
-                <div className="font-bold text-[#105784]">👑 Super Admin</div>
-                <div className="text-[10px] text-gray-500 font-mono truncate">admin@skywardens.com</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">Full System + Leads</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("v.malhotra@skywardens.com");
-                  setPassword("SkyWardens@2026");
-                  setErrorMessage("");
-                }}
-                className="p-2 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-slate-200 rounded-lg text-left text-[11px] transition cursor-pointer"
-              >
-                <div className="font-bold text-emerald-700">🛡️ Normal Admin</div>
-                <div className="text-[10px] text-gray-500 font-mono truncate">v.malhotra@skywardens.com</div>
-                <div className="text-[9px] text-gray-400 mt-0.5">Operations (No Leads)</div>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Under Card Contact Link */}
-        <div className="mt-4 text-center">
-          <p className="text-xs text-gray-300">
-            Need access? Contact{" "}
-            <a
-              href="mailto:security@skywardens.com"
-              className="text-sky-300 hover:text-white font-medium underline underline-offset-2 transition-colors"
-            >
-              security@skywardens.com
-            </a>
-          </p>
         </div>
       </div>
 

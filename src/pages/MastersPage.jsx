@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   Layers,
   Plus,
@@ -15,8 +15,11 @@ import {
   Database,
   AlertTriangle,
   Boxes,
+  UploadCloud,
+  Loader2,
 } from "lucide-react";
 import { useProducts } from "../context/ProductsContext";
+import { validateImageFile, compressToWebP } from "../utils/imageCompressor";
 
 export default function MastersPage({ onNavigateTab }) {
   const {
@@ -459,7 +462,74 @@ function DivisionFormModal({ mode = "add", initialData = null, onClose, onSubmit
     initialData?.description || ""
   );
   const [status, setStatus] = useState(initialData?.status || "Active");
+  const [sector, setSector] = useState(initialData?.sector || "");
+  const [buttonText, setButtonText] = useState(initialData?.buttonText || "");
+  const [imageSrc, setImageSrc] = useState(initialData?.imageSrc || "");
+  const [logoSrc, setLogoSrc] = useState(initialData?.logoSrc || "");
+  const [order, setOrder] = useState(
+    initialData?.order !== undefined ? initialData.order : 0
+  );
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Image Upload States
+  const [imageSourceMode, setImageSourceMode] = useState("upload"); // 'upload' | 'url'
+  const [logoSourceMode, setLogoSourceMode] = useState("upload"); // 'upload' | 'url'
+  const [isImageDragging, setIsImageDragging] = useState(false);
+  const [isLogoDragging, setIsLogoDragging] = useState(false);
+  const [compressingTarget, setCompressingTarget] = useState(null); // 'image' | 'logo' | null
+  const [imageFileName, setImageFileName] = useState("");
+  const [logoFileName, setLogoFileName] = useState("");
+  const [imageCompressionInfo, setImageCompressionInfo] = useState(null);
+  const [logoCompressionInfo, setLogoCompressionInfo] = useState(null);
+  const imageInputRef = useRef(null);
+  const logoInputRef = useRef(null);
+
+  const handleProcessFile = async (file, target) => {
+    if (!file) return;
+
+    // 1. Strict Validation: reject gifs, videos, and non-image types
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setErrorMsg(validation.error);
+      return;
+    }
+
+    try {
+      setErrorMsg("");
+      setCompressingTarget(target);
+
+      // 2. High-Resolution WebP Compression (2560px for background, 1200px for logo)
+      const options =
+        target === "image"
+          ? { maxWidth: 2560, maxHeight: 1600, quality: 0.90 }
+          : { maxWidth: 1200, maxHeight: 1200, quality: 0.92 };
+
+      const result = await compressToWebP(file, options);
+
+      const origKb = Math.round(result.originalSize / 1024);
+      const compKb = Math.round(result.compressedSize / 1024);
+      const savings = Math.max(
+        0,
+        Math.round(((result.originalSize - result.compressedSize) / result.originalSize) * 100)
+      );
+      const infoText = `High-Res WebP (${result.width}×${result.height}) • ${compKb} KB (${savings}% saved)`;
+
+      if (target === "image") {
+        setImageSrc(result.dataUrl);
+        setImageFileName(file.name.replace(/\.[^/.]+$/, "") + ".webp");
+        setImageCompressionInfo(infoText);
+      } else {
+        setLogoSrc(result.dataUrl);
+        setLogoFileName(file.name.replace(/\.[^/.]+$/, "") + ".webp");
+        setLogoCompressionInfo(infoText);
+      }
+    } catch (err) {
+      console.error("Image compression error:", err);
+      setErrorMsg(err.message || "Failed to compress image.");
+    } finally {
+      setCompressingTarget(null);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -471,84 +541,457 @@ function DivisionFormModal({ mode = "add", initialData = null, onClose, onSubmit
       name: name.trim(),
       description: description.trim(),
       status,
+      sector: sector.trim(),
+      buttonText: buttonText.trim(),
+      imageSrc: imageSrc.trim(),
+      logoSrc: logoSrc.trim(),
+      order: Number(order) || 0,
     });
   };
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn"
-    >
+    <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
+      {/* Backdrop */}
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-gray-200 relative space-y-4"
-      >
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <div>
-            <h3 className="text-base font-bold text-[#1c232f]">
-              {mode === "add" ? "Create New Division" : `Edit Division: ${initialData?.name}`}
-            </h3>
-            <p className="text-xs text-gray-500">
-              Configure industrial vertical pillar for the catalog.
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 p-1 cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        onClick={onClose}
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn cursor-pointer"
+      />
 
-        {errorMsg && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-3 py-2 rounded-lg">
-            {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-          <div>
-            <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-              Division Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Petrochemicals / Advanced Systems / Space"
-              required
-              className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-              Operational Status
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
+      {/* Slide-Over Drawer Container */}
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10 pointer-events-none">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-screen max-w-lg sm:max-w-xl bg-white shadow-2xl flex flex-col border-l border-gray-200 animate-slideInRight pointer-events-auto"
+        >
+          {/* Drawer Header */}
+          <div className="px-6 py-4 border-b border-gray-200 bg-[#1c232f] text-white flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#105784] flex items-center justify-center text-white shadow-2xs">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white leading-tight">
+                  {mode === "add" ? "Create New Division" : `Edit Division: ${initialData?.name}`}
+                </h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Configure industrial vertical pillar and homepage business card.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
             >
-              <option value="Active">Active (Live in Products Catalog)</option>
-              <option value="Inactive">Inactive (Disabled / Hidden)</option>
-            </select>
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-              Description / Mission Scope
-            </label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description of the equipment domain, operational readiness, and systems..."
-              className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
-            />
-          </div>
+          {errorMsg && (
+            <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl">
+              {errorMsg}
+            </div>
+          )}
 
-          <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          {/* Drawer Body Form (scrollable) */}
+          <form
+            id="division-form"
+            onSubmit={handleSubmit}
+            className="flex-1 overflow-y-auto p-6 space-y-5 text-xs"
+          >
+            {/* Section 1: Core Division Details */}
+            <div className="space-y-3">
+              <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                Core Division Settings
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Division Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Petrochemicals"
+                    required
+                    className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Operational Status
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition font-semibold"
+                  >
+                    <option value="Active">Active (Live in Admin & Homepage)</option>
+                    <option value="Inactive">Inactive (Disabled / Hidden)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                  Description / Mission Scope
+                </label>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Description of the equipment domain, operational readiness, and systems..."
+                  className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
+                />
+              </div>
+            </div>
+
+            {/* Section 2: Homepage "Our Businesses" Card Settings */}
+            <div className="pt-4 border-t border-gray-100 space-y-4">
+              <h4 className="text-[11px] font-bold text-[#105784] uppercase tracking-wider flex items-center gap-1.5">
+                <span>Homepage "Our Businesses" Card Settings</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Sector Tag
+                  </label>
+                  <input
+                    type="text"
+                    value={sector}
+                    onChange={(e) => setSector(e.target.value)}
+                    placeholder="e.g. Sector 1"
+                    className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Button Text
+                  </label>
+                  <input
+                    type="text"
+                    value={buttonText}
+                    onChange={(e) => setButtonText(e.target.value)}
+                    placeholder={`Explore ${name || "Division"}`}
+                    className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Display Order
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={order}
+                    onChange={(e) => setOrder(e.target.value)}
+                    placeholder="1, 2, 3..."
+                    className="w-full px-3 py-2 bg-[#f8fafc] border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white text-xs transition font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* CARD BACKGROUND IMAGE UPLOADER */}
+              <div className="space-y-1.5 p-3.5 bg-[#f8fafc] rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase">
+                    Card Background Image
+                  </label>
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setImageSourceMode("upload")}
+                      className={`px-2 py-0.5 text-[10px] rounded font-semibold transition cursor-pointer ${
+                        imageSourceMode === "upload"
+                          ? "bg-[#105784] text-white shadow-2xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSourceMode("url")}
+                      className={`px-2 py-0.5 text-[10px] rounded font-semibold transition cursor-pointer ${
+                        imageSourceMode === "url"
+                          ? "bg-[#105784] text-white shadow-2xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      URL / Path
+                    </button>
+                  </div>
+                </div>
+
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => handleProcessFile(e.target.files?.[0], "image")}
+                />
+
+                {imageSrc ? (
+                  <div className="flex items-center gap-3 p-2.5 bg-white border border-gray-200 rounded-lg shadow-2xs">
+                    <div className="w-20 h-16 bg-[#161c25] rounded-md flex items-center justify-center shrink-0 border border-gray-200 overflow-hidden">
+                      <img
+                        src={imageSrc}
+                        alt="Background Preview"
+                        className="max-h-full max-w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">
+                        {imageFileName || imageSrc.split("/").pop() || "Background Image Attached"}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          {imageCompressionInfo || "High-Res WebP Attached"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (imageSourceMode === "upload") {
+                              imageInputRef.current?.click();
+                            } else {
+                              setImageSrc("");
+                            }
+                          }}
+                          className="text-[11px] font-semibold text-[#105784] hover:underline cursor-pointer"
+                        >
+                          Change Image
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageSrc("");
+                            setImageFileName("");
+                            setImageCompressionInfo(null);
+                          }}
+                          className="text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {imageSourceMode === "upload" ? (
+                      compressingTarget === "image" ? (
+                        <div className="p-6 text-center border-2 border-dashed border-[#105784] rounded-lg bg-sky-50/50">
+                          <Loader2 className="w-6 h-6 text-[#105784] animate-spin mx-auto mb-1.5" />
+                          <span className="text-xs font-bold text-gray-800 block">
+                            Compressing to High-Resolution WebP...
+                          </span>
+                          <span className="text-[10px] text-gray-500 block mt-0.5">
+                            Optimizing crisp 2K display resolution & reducing size
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsImageDragging(true);
+                          }}
+                          onDragLeave={() => setIsImageDragging(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsImageDragging(false);
+                            const file = e.dataTransfer.files?.[0];
+                            if (file) handleProcessFile(file, "image");
+                          }}
+                          onClick={() => imageInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-lg p-4 text-center transition cursor-pointer ${
+                            isImageDragging
+                              ? "border-[#105784] bg-sky-50"
+                              : "border-gray-300 hover:border-gray-400 bg-white"
+                          }`}
+                        >
+                          <UploadCloud className="w-6 h-6 text-[#105784] mx-auto mb-1" />
+                          <span className="text-xs font-semibold text-gray-700 block">
+                            Click to browse or drag & drop background image
+                          </span>
+                          <span className="text-[10px] text-gray-400 block mt-0.5">
+                            Auto-converted to High-Res WebP (PNG, JPG, WEBP only • No GIF/Video)
+                          </span>
+                        </div>
+                      )
+                    ) : (
+                      <input
+                        type="text"
+                        value={imageSrc}
+                        onChange={(e) => setImageSrc(e.target.value)}
+                        placeholder="/images/business-aerospace.jpg"
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] text-xs transition font-mono"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* FLOATING CENTER LOGO UPLOADER */}
+              <div className="space-y-1.5 p-3.5 bg-[#f8fafc] rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase">
+                    Floating Center Logo (White/Transparent)
+                  </label>
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setLogoSourceMode("upload")}
+                      className={`px-2 py-0.5 text-[10px] rounded font-semibold transition cursor-pointer ${
+                        logoSourceMode === "upload"
+                          ? "bg-[#105784] text-white shadow-2xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLogoSourceMode("url")}
+                      className={`px-2 py-0.5 text-[10px] rounded font-semibold transition cursor-pointer ${
+                        logoSourceMode === "url"
+                          ? "bg-[#105784] text-white shadow-2xs"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      URL / Path
+                    </button>
+                  </div>
+                </div>
+
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => handleProcessFile(e.target.files?.[0], "logo")}
+                />
+
+                {logoSrc ? (
+                  <div className="flex items-center gap-3 p-2.5 bg-white border border-gray-200 rounded-lg shadow-2xs">
+                    <div className="w-20 h-16 bg-[#161c25] rounded-md flex items-center justify-center shrink-0 border border-gray-200 overflow-hidden">
+                      <img
+                        src={logoSrc}
+                        alt="Logo Preview"
+                        className="max-h-full max-w-full object-contain p-1"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">
+                        {logoFileName || logoSrc.split("/").pop() || "Logo Image Attached"}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          {logoCompressionInfo || "High-Res Logo WebP Attached"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (logoSourceMode === "upload") {
+                              logoInputRef.current?.click();
+                            } else {
+                              setLogoSrc("");
+                            }
+                          }}
+                          className="text-[11px] font-semibold text-[#105784] hover:underline cursor-pointer"
+                        >
+                          Change Logo
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogoSrc("");
+                            setLogoFileName("");
+                            setLogoCompressionInfo(null);
+                          }}
+                          className="text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {logoSourceMode === "upload" ? (
+                      compressingTarget === "logo" ? (
+                        <div className="p-6 text-center border-2 border-dashed border-[#105784] rounded-lg bg-sky-50/50">
+                          <Loader2 className="w-6 h-6 text-[#105784] animate-spin mx-auto mb-1.5" />
+                          <span className="text-xs font-bold text-gray-800 block">
+                            Compressing Logo to WebP...
+                          </span>
+                          <span className="text-[10px] text-gray-500 block mt-0.5">
+                            Preserving transparent background & sharp vector clarity
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsLogoDragging(true);
+                          }}
+                          onDragLeave={() => setIsLogoDragging(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsLogoDragging(false);
+                            const file = e.dataTransfer.files?.[0];
+                            if (file) handleProcessFile(file, "logo");
+                          }}
+                          onClick={() => logoInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-lg p-4 text-center transition cursor-pointer ${
+                            isLogoDragging
+                              ? "border-[#105784] bg-sky-50"
+                              : "border-gray-300 hover:border-gray-400 bg-white"
+                          }`}
+                        >
+                          <UploadCloud className="w-6 h-6 text-[#105784] mx-auto mb-1" />
+                          <span className="text-xs font-semibold text-gray-700 block">
+                            Click to browse or drag & drop center logo
+                          </span>
+                          <span className="text-[10px] text-gray-400 block mt-0.5">
+                            Transparent PNG, JPG, WEBP (Auto-converted to high-res WebP • No GIF/Video)
+                          </span>
+                        </div>
+                      )
+                    ) : (
+                      <input
+                        type="text"
+                        value={logoSrc}
+                        onChange={(e) => setLogoSrc(e.target.value)}
+                        placeholder="/images/aerospace.png"
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#105784] text-xs transition font-mono"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </form>
+
+          {/* Drawer Footer (fixed at bottom) */}
+          <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -558,12 +1001,13 @@ function DivisionFormModal({ mode = "add", initialData = null, onClose, onSubmit
             </button>
             <button
               type="submit"
+              form="division-form"
               className="px-5 py-2 text-xs font-bold bg-[#105784] hover:bg-[#0c476c] text-white rounded-lg shadow-2xs transition cursor-pointer"
             >
               {mode === "add" ? "Create Division" : "Save Changes"}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

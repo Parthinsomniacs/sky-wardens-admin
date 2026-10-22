@@ -47,6 +47,14 @@ export const authApi = {
     const res = await api.get("/auth/me");
     return res.data;
   },
+  updateProfile: async (data) => {
+    const res = await api.put("/auth/profile", data);
+    return res.data;
+  },
+  changePassword: async (data) => {
+    const res = await api.put("/auth/change-password", data);
+    return res.data;
+  },
 };
 
 // 2. PRODUCTS API
@@ -101,6 +109,14 @@ export const divisionsApi = {
   },
 };
 
+// 3B. CATEGORIES API
+export const categoriesApi = {
+  getAll: async () => [],
+  create: async (catData) => catData,
+  update: async (id, catData) => catData,
+  delete: async (id) => ({ success: true }),
+};
+
 // 4. LEADS API
 export const leadsApi = {
   getAll: async (params) => {
@@ -113,6 +129,10 @@ export const leadsApi = {
   },
   update: async (id, leadData) => {
     const res = await api.put(`/leads/${id}`, leadData);
+    return res.data.lead;
+  },
+  updateStatus: async (id, status) => {
+    const res = await api.put(`/leads/${id}`, { status });
     return res.data.lead;
   },
   delete: async (id) => {

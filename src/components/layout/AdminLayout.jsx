@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Menu,
   X,
-  Search,
-  Bell,
   LogOut,
   LayoutDashboard,
   Mail,
@@ -19,7 +17,7 @@ import {
   Cpu,
   FlaskConical,
   Layers,
-  Crown,
+  User,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../context/ProductsContext";
@@ -29,16 +27,15 @@ export default function AdminLayout({
   currentTab = "dashboard",
   onTabChange,
 }) {
-  const { user, logout, switchRole, isSuperAdmin } = useAuth();
+  const { user, logout, isSuperAdmin } = useAuth();
   const { divisions = [], products = [] } = useProducts();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [productsExpanded, setProductsExpanded] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const userMenuRef = useRef(null);
-  const notifMenuRef = useRef(null);
 
   // Close dropdowns on outside click or escape
   useEffect(() => {
@@ -46,15 +43,11 @@ export default function AdminLayout({
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserDropdownOpen(false);
       }
-      if (notifMenuRef.current && !notifMenuRef.current.contains(e.target)) {
-        setNotificationsOpen(false);
-      }
     };
 
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         setUserDropdownOpen(false);
-        setNotificationsOpen(false);
       }
     };
 
@@ -65,6 +58,68 @@ export default function AdminLayout({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  const aerospaceCount = products.filter(
+    (p) => (p.division || "").toLowerCase() === "aerospace"
+  ).length;
+
+  const defenceCount = products.filter(
+    (p) => (p.division || "").toLowerCase() === "defence"
+  ).length;
+
+  const divisionNavItems = useMemo(() => {
+    if (divisions && divisions.length > 0) {
+      return divisions
+        .filter((d) => (d.status || "Active") === "Active")
+        .map((d) => {
+          const slug = d.slug || d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+          const count = products.filter(
+            (p) => (p.division || "").toLowerCase() === d.name.toLowerCase()
+          ).length;
+
+          let Icon = Layers;
+          let badgeColor = "bg-sky-600";
+          if (d.name.toLowerCase() === "aerospace") {
+            Icon = Plane;
+            badgeColor = "bg-sky-600";
+          } else if (d.name.toLowerCase() === "defence") {
+            Icon = Shield;
+            badgeColor = "bg-emerald-600";
+          } else if (d.name.toLowerCase() === "advanced systems") {
+            Icon = Cpu;
+            badgeColor = "bg-purple-600";
+          } else if (d.name.toLowerCase() === "petrochemicals") {
+            Icon = FlaskConical;
+            badgeColor = "bg-amber-600";
+          }
+
+          return {
+            id: `products-${slug}`,
+            label: `${d.name} Products`,
+            icon: Icon,
+            badge: count > 0 ? count : null,
+            badgeColor,
+          };
+        });
+    }
+
+    return [
+      {
+        id: "products-aerospace",
+        label: "Aerospace Products",
+        icon: Plane,
+        badge: aerospaceCount > 0 ? aerospaceCount : null,
+        badgeColor: "bg-sky-600",
+      },
+      {
+        id: "products-defence",
+        label: "Defence Products",
+        icon: Shield,
+        badge: defenceCount > 0 ? defenceCount : null,
+        badgeColor: "bg-emerald-600",
+      },
+    ];
+  }, [divisions, products, aerospaceCount, defenceCount]);
 
   const navGroups = [
     {
@@ -95,39 +150,12 @@ export default function AdminLayout({
         ]
       : []),
     {
-      group: "PRODUCTS",
+      group: "PRODUCT CATALOGS",
       items: [
-        {
-          id: "products",
-          label: "Products",
-          icon: Package,
-          subItems: divisions.map((d) => {
-            const count = products.filter((p) => p.division === d.name).length;
-            const targetId =
-              d.slug === "aerospace"
-                ? "products-aerospace"
-                : d.slug === "defence"
-                ? "products-defence"
-                : `products-${d.slug}`;
-
-            let iconComp = Layers;
-            if (d.name === "Aerospace") iconComp = Plane;
-            else if (d.name === "Defence") iconComp = Shield;
-            else if (d.name === "Advanced Systems") iconComp = Cpu;
-            else if (d.name === "Petrochemicals") iconComp = FlaskConical;
-
-            return {
-              id: targetId,
-              label: d.name,
-              icon: iconComp,
-              badge: null,
-              badgeColor: d.badgeColor || "bg-indigo-600",
-            };
-          }),
-        },
+        ...divisionNavItems,
         {
           id: "masters",
-          label: "Masters",
+          label: "Masters (Categories)",
           icon: Database,
           badge: null,
           badgeColor: "bg-indigo-600",
@@ -148,32 +176,7 @@ export default function AdminLayout({
     },
   ];
 
-  const recentNotifications = [
-    {
-      id: "notif-1",
-      title: "New Tactical UAV Inquiry",
-      desc: "Indian Air Force Procurement Wing requested specs for AeroViper.",
-      time: "Today, 15:42",
-      unread: true,
-      tab: "contact-leads",
-    },
-    {
-      id: "notif-2",
-      title: "Guidance System RFQ",
-      desc: "Lockheed Martin Tactical Systems submitted inquiry for Sky-Nav 400.",
-      time: "Today, 11:20",
-      unread: true,
-      tab: "contact-leads",
-    },
-    {
-      id: "notif-3",
-      title: "Security Telemetry Passed",
-      desc: "Automated penetration test completed: Zero vulnerabilities detected.",
-      time: "Yesterday, 22:00",
-      unread: false,
-      tab: "users",
-    },
-  ];
+
 
   const getPageTitle = (tab) => {
     switch (tab) {
@@ -187,10 +190,23 @@ export default function AdminLayout({
         return "Aerospace Products Catalog";
       case "products-defence":
         return "Defence Products Catalog";
+      case "masters":
+        return "Masters (Divisions & Categories)";
       case "users":
         return "Admin Users & Clearance";
-      default:
+      case "profile":
+        return "Profile";
+      default: {
+        if (tab.startsWith("products-")) {
+          const matched = divisions.find(
+            (d) =>
+              `products-${d.slug || d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` ===
+              tab
+          );
+          if (matched) return `${matched.name} Products Catalog`;
+        }
         return "Management Console";
+      }
     }
   };
 
@@ -245,19 +261,19 @@ export default function AdminLayout({
         </div>
 
         {/* Sidebar Nav Items */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-5 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-1">
-              {sidebarOpen && (
-                <p className="px-3 text-[10px] font-bold text-[#6c7b93] tracking-wider uppercase mb-1.5 select-none">
-                  {group.group}
-                </p>
-              )}
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
                 const isItemActive =
                   currentTab === item.id ||
+                  (item.id === "products-aerospace" &&
+                    (currentTab === "products" ||
+                      currentTab === "products-aerospace")) ||
+                  (item.id === "products-defence" &&
+                    currentTab === "products-defence") ||
                   (item.id === "contact-leads" && currentTab === "leads");
                 const isChildActive =
                   hasSubItems &&
@@ -403,24 +419,38 @@ export default function AdminLayout({
         {/* Sidebar Footer User Card */}
         <div className="p-3 bg-[#161c25] border-t border-[#252f3e] shrink-0">
           <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#1c232f]">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-[#105784] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                {user?.avatar || "SA"}
-              </div>
+            <button
+              onClick={() => {
+                if (onTabChange) onTabChange("profile");
+                setMobileMenuOpen(false);
+              }}
+              className="flex items-center gap-2.5 overflow-hidden text-left hover:opacity-90 transition cursor-pointer flex-1 group"
+              title="View & Edit Profile"
+            >
+              {user?.avatar && (user.avatar.startsWith("data:") || user.avatar.startsWith("http") || user.avatar.startsWith("/")) ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name || "User"}
+                  className="w-8 h-8 rounded-full object-cover shrink-0 shadow-2xs group-hover:ring-2 group-hover:ring-sky-400 transition"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#105784] group-hover:ring-2 group-hover:ring-sky-400 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs transition">
+                  {user?.name
+                    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                    : (user?.avatar || "SA")}
+                </div>
+              )}
               {sidebarOpen && (
                 <div className="flex flex-col overflow-hidden text-left">
-                  <span className="text-xs font-semibold text-white truncate">
+                  <span className="text-xs font-semibold text-white truncate group-hover:text-sky-300 transition">
                     {user?.name || "Super Admin"}
-                  </span>
-                  <span className="text-[10px] text-gray-400 truncate">
-                    {user?.clearance || "Level 5 Top Secret"}
                   </span>
                 </div>
               )}
-            </div>
+            </button>
             {sidebarOpen && (
               <button
-                onClick={logout}
+                onClick={() => setShowLogoutConfirm(true)}
                 title="Sign Out"
                 className="text-gray-400 hover:text-red-400 p-1.5 rounded transition-colors cursor-pointer"
               >
@@ -465,142 +495,31 @@ export default function AdminLayout({
               </span>
             </div>
 
-            {/* Global Search Bar */}
-            <div className="relative hidden md:block w-56 lg:w-72 ml-2">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search leads, pages, banners..."
-                className="w-full pl-9 pr-10 py-1.5 text-xs bg-[#f4f7fa] border border-[#e2e8f0] rounded-lg focus:outline-none focus:border-[#105784] focus:bg-white transition"
-              />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 bg-white border border-gray-200 px-1 py-0.2 rounded font-mono">
-                ⌘K
-              </span>
-            </div>
           </div>
 
-          {/* Right: Role Switcher, SOC Status, Notifications, User Menu */}
+          {/* Right: User Menu */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick Role Simulation Switcher */}
-            <div className="flex items-center gap-1 bg-[#f4f7fa] p-1 rounded-xl border border-[#e2e8f0]">
-              <button
-                type="button"
-                onClick={() => switchRole && switchRole("Super Admin")}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                  user?.role === "Super Admin"
-                    ? "bg-purple-700 text-white shadow-2xs"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Super Admin Mode: Full System Access (Leads Visible)"
-              >
-                <Crown className="w-3 h-3" />
-                <span className="hidden md:inline">Super Admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (switchRole) switchRole("Normal Admin");
-                  if (currentTab === "contact-leads" || currentTab === "leads") {
-                    if (onTabChange) onTabChange("dashboard");
-                  }
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                  user?.role === "Normal Admin"
-                    ? "bg-[#105784] text-white shadow-2xs"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Normal Admin Mode: Operational (Leads Hidden)"
-              >
-                <Shield className="w-3 h-3" />
-                <span className="hidden md:inline">Normal Admin</span>
-              </button>
-            </div>
-
-            {/* Notification Bell Dropdown */}
-            <div ref={notifMenuRef} className="relative">
-              <button
-                onClick={() => {
-                  setNotificationsOpen(!notificationsOpen);
-                  setUserDropdownOpen(false);
-                }}
-                title="Notifications"
-                className="relative p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition cursor-pointer"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500" />
-              </button>
-
-              {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fadeIn">
-                  <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1c232f]">
-                      Operational Alerts
-                    </span>
-                    <span className="text-[10px] bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded">
-                      2 Unread
-                    </span>
-                  </div>
-
-                  <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-                    {recentNotifications.map((notif) => (
-                      <div
-                        key={notif.id}
-                        onClick={() => {
-                          setNotificationsOpen(false);
-                          if (notif.tab === "contact-leads" && !isSuperAdmin) {
-                            if (onTabChange) onTabChange("dashboard");
-                          } else if (onTabChange) {
-                            onTabChange(notif.tab);
-                          }
-                        }}
-                        className={`p-3 text-xs hover:bg-gray-50 cursor-pointer transition ${
-                          notif.unread ? "bg-sky-50/40" : ""
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-800">
-                            {notif.title}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {notif.time}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">
-                          {notif.desc}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {isSuperAdmin && (
-                    <div className="pt-2 px-3 border-t border-gray-100 text-center">
-                      <button
-                        onClick={() => {
-                          setNotificationsOpen(false);
-                          if (onTabChange) onTabChange("contact-leads");
-                        }}
-                        className="text-xs font-semibold text-[#105784] hover:underline cursor-pointer"
-                      >
-                        View All Contact Leads
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* User Profile Menu */}
             <div ref={userMenuRef} className="relative">
               <button
                 onClick={() => {
                   setUserDropdownOpen(!userDropdownOpen);
-                  setNotificationsOpen(false);
                 }}
                 className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-full bg-[#105784] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
-                  {user?.avatar || "SA"}
-                </div>
+                {user?.avatar && (user.avatar.startsWith("data:") || user.avatar.startsWith("http") || user.avatar.startsWith("/")) ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name || "User"}
+                    className="w-8 h-8 rounded-full object-cover shrink-0 shadow-2xs"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[#105784] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                    {user?.name
+                      ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                      : (user?.avatar || "SA")}
+                  </div>
+                )}
                 <div className="hidden sm:flex flex-col text-left">
                   <span className="text-xs font-bold text-[#1c232f] leading-tight">
                     {user?.name || "Super Admin"}
@@ -624,16 +543,26 @@ export default function AdminLayout({
                     </p>
                   </div>
 
-                  <div className="pt-1">
+                  <div className="p-1 space-y-0.5">
                     <button
                       onClick={() => {
                         setUserDropdownOpen(false);
-                        logout();
+                        if (onTabChange) onTabChange("profile");
                       }}
-                      className="w-full px-4 py-2 text-xs text-left text-red-600 hover:bg-red-50 flex items-center gap-2 font-semibold cursor-pointer"
+                      className="w-full px-3 py-2 text-xs text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-lg font-medium cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Profile</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setShowLogoutConfirm(true);
+                      }}
+                      className="w-full px-3 py-2 text-xs text-left text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-lg font-medium cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5 text-red-500" />
-                      Sign Out
+                      <span>Sign Out</span>
                     </button>
                   </div>
                 </div>
@@ -647,6 +576,50 @@ export default function AdminLayout({
           {children}
         </main>
       </div>
+
+      {/* Logout Confirmation Popup Modal */}
+      {showLogoutConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn"
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100 text-center relative"
+          >
+            <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-100">
+              <LogOut className="w-6 h-6 ml-0.5" />
+            </div>
+
+            <h3 className="text-base font-bold text-[#1c232f] tracking-tight">
+              Confirm Logout
+            </h3>
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              Are you sure you want to log out of the Sky Wardens Admin Console?
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition cursor-pointer"
+              >
+                No, Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  logout();
+                }}
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
+              >
+                Yes, Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
