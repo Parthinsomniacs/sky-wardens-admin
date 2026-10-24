@@ -1024,6 +1024,7 @@ export default function ProductsPage({
               setShowAddDrawer(false);
             } catch (err) {
               triggerToast(err.message || "Failed to create product.");
+              throw err;
             }
           }}
         />

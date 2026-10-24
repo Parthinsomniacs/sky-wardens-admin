@@ -300,8 +300,9 @@ export function ProductsProvider({ children }) {
       return created;
     } catch (err) {
       console.error("Backend error creating product:", err);
-      setProducts((prev) => [formattedProduct, ...prev]);
-      return formattedProduct;
+      const msg =
+        err.response?.data?.message || err.message || "Failed to create product in database.";
+      throw new Error(msg);
     }
   };
 
